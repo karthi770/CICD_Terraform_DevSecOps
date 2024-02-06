@@ -12,6 +12,7 @@ resource "aws_instance" "website" {
 resource "aws_security_group" "ec2_security_group" {
   name        = "ec2 security group"
   description = "allow access on ports 80 and 22 and 443"
+  vpc_id = "vpc-047714d71a6ec55f4"
 
   ingress {
     description      = "ssh access"
@@ -59,3 +60,5 @@ resource "aws_security_group" "ec2_security_group" {
     Name = "web_sg"
   }
 }
+
+ 
