@@ -17,5 +17,5 @@ variable "ami_id" {
 variable "bucketname" {
   description = "The name of the S3 bucket to create"
   type        = string
-  default     = "karthi_cloud_devsec"  
+  default     = "karthi-cloud-devsec"  
 }
