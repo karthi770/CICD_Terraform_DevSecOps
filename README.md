@@ -217,6 +217,115 @@ resource "aws_security_group" "ec2_security_group" {
 }
 ```
 
+```python
+#variables.tf
+variable "aws_region" {
+  description = "The AWS region to create things in."
+  default     = "us-east-1"
+}
+variable "key_name" {
+  description = "SSH keys to connect to ec2 instance"
+  default     = "devsecops_zomato"     #change key name here
+}
+variable "instance_type" {
+  description = "instance type for ec2"
+  default     = "t2.medium"
+}
+variable "ami_id" {
+  description = "AMI for Ubuntu Ec2 instance"
+  default     = "ami-0c7217cdde317cfec"
+}
+variable "bucketname" {
+  description = "The name of the S3 bucket to create"
+  type        = string
+  default     = "karthi-cloud-devsec"  
+}
+```
+
+```python
+#create s3 bucket
+resource "aws_s3_bucket" "mybucket" {
+  bucket = var.bucketname
+}
+
+resource "aws_s3_bucket_ownership_controls" "example" {
+  bucket = aws_s3_bucket.mybucket.id
+
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "example" {
+  bucket = aws_s3_bucket.mybucket.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_acl" "example" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.example,
+    aws_s3_bucket_public_access_block.example,
+  ]
+
+  bucket = aws_s3_bucket.mybucket.id
+  acl    = "public-read"
+}
+
+resource "aws_s3_object" "index" {
+  bucket = aws_s3_bucket.mybucket.id
+  key = "index.html"
+  source = "index.html"
+  acl = "public-read"
+  content_type = "text/html"
+}
+
+resource "aws_s3_object" "error" {
+  bucket = aws_s3_bucket.mybucket.id
+  key = "error.html"
+  source = "error.html"
+  acl = "public-read"
+  content_type = "text/html"
+}
+
+resource "aws_s3_object" "style" {
+  bucket = aws_s3_bucket.mybucket.id
+  key = "style.css"
+  source = "style.css"
+  acl = "public-read"
+  content_type = "text/css"
+}
+
+resource "aws_s3_object" "script" {
+  bucket = aws_s3_bucket.mybucket.id
+  key = "script.js"
+  source = "script.js"
+  acl = "public-read"
+  content_type = "text/javascript"
+}
+
+resource "aws_s3_bucket_website_configuration" "website" {
+  bucket = aws_s3_bucket.mybucket.id
+  index_document {
+    suffix = "index.html"
+  }
+
+  error_document {
+    key = "error.html"
+  }
+}
+```
+
+```python
+#output.tf
+output "public_ip" {
+    value= aws_instance.website.public_ip
+}
+```
+
 ### Jenkins Pipeline
 ![image](https://github.com/karthi770/CICD_Terraform_DevSecOps/assets/102706119/0128aff1-d190-40be-9f0f-33d8c6d08d81)
 ```groovy
@@ -248,7 +357,7 @@ pipeline{
         stage("Sonarqube Analysis "){  
             steps{  
                 withSonarQubeEnv('sonar-server') {  
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Terraform \  
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Terraform \
                     -Dsonar.projectKey=Terraform '''  
                 }  
             }  
@@ -256,7 +365,7 @@ pipeline{
         stage("quality gate"){  
            steps {  
                 script {  
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'   
+                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonarqube-token'   
                 }  
             }   
         }  
@@ -264,17 +373,27 @@ pipeline{
             steps {  
                 sh "trivy fs . > trivyfs.txt"  
             }  
-        }
-         stage('Executable premission to website file'){
+        }  
+        stage('Executable premission to website file'){
             steps{
                 sh 'chmod 777 website.sh'
             }
-        }  
+        }
+                stage('Terraform init'){
+            steps{
+                sh 'terraform init'
+            }
+        }
+        stage('Terraform plan'){
+            steps{
+                sh 'terraform plan'
+            }
+        }
         stage('Terraform action'){
             steps{
-                sh'terraform ${action} --auto-approve'
+                sh'terraform ${terraform_actions} --auto-approve'
             }
-        }  
+        }
     }  
 }
 ```
@@ -283,7 +402,6 @@ pipeline{
 >add ubuntu as a user to the sudo group since the we need permissions to execute the website.sh file.
 `sudo usermod -aG sudo ubuntu`  
 `sudo apt update`
-
 
 ![image](https://github.com/karthi770/CICD_Terraform_DevSecOps/assets/102706119/daca46b8-c2ed-435f-9208-3711fc42b9d8)
 
@@ -300,8 +418,6 @@ In order for jenkins to give us the option to apply and destroy, we need to para
 >If we click on it we can see the option to apply and destroy
 
 ![image](https://github.com/karthi770/Hosting-Wordpress-AWS/assets/102706119/f04c082b-ffad-4117-b61b-9034eb90fc51)
-
-
 
 ### Results
 
